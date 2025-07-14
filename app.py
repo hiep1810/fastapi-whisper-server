@@ -1,3 +1,4 @@
+from dotenv import load_dotenv
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.responses import FileResponse, JSONResponse
 import subprocess
@@ -5,13 +6,15 @@ import os
 import shutil
 from uuid import uuid4
 
+load_dotenv()  # <-- Load environment variables from .env file
+
 app = FastAPI()
 
 # Path to your whisper-cli binary
-WHISPER_CLI = "/data/data/com.termux/files/home/python/fastapi-whisper-server/whisper.cpp/build/bin/whisper-cli"
+WHISPER_CLI = os.environ.get("WHISPER_CLI")
 
 # Path to your model
-MODEL = "/data/data/com.termux/files/home/python/fastapi-whisper-server/whisper.cpp/models/ggml-medium.bin"
+MODEL = os.environ.get("MODEL")
 
 UPLOAD_DIR = "./uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
