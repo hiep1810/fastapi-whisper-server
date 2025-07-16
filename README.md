@@ -16,7 +16,9 @@ This project provides a simple FastAPI server to transcribe audio files using [W
 | ✅ MVP | Upload + basic SRT output | Working core |
 | 🚀 Phase 1 | Multi-format + auto language + metadata | Production-ready core |
 | ⚡ Phase 2 | Auth + remote URL + cleanup | Safe & scalable |
-| ✨ Phase 3 | Diarization + dashboard | Polished product |
+| ✨ Phase 3 | Dashboard | Polished product |
+| 🚀 Phase 4 | Transcription Queue | Handle multiple requests |
+| 💡 Future | Diarization | Speaker-separated transcripts |
 
 ## Prerequisites
 
@@ -60,13 +62,27 @@ This project provides a simple FastAPI server to transcribe audio files using [W
 
 ## Usage
 
-1.  **Start the server:**
+**IMPORTANT**: Before starting the application, make sure you have Redis installed and running.
+
+1.  **Start Redis:**
 
     ```bash
-    uvicorn app:app --host 0.0.0.0 --port 8000
+    redis-server
     ```
 
-2.  **Send a transcription request:**
+2.  **Start the Celery worker:**
+
+    ```bash
+    celery -A celery_worker.celery_app worker --loglevel=info
+    ```
+
+3.  **Start the server:**
+
+    ```bash
+    python -m uvicorn app:app --host 0.0.0.0 --port 8000
+    ```
+
+4.  **Send a transcription request:**
 
     You can use a tool like `curl` to send a `POST` request to the `/transcribe` endpoint:
 
@@ -78,13 +94,13 @@ This project provides a simple FastAPI server to transcribe audio files using [W
     -   `language` (optional): The language of the audio. If not provided, Whisper will try to auto-detect the language.
     -   `format` (optional): The desired output format. Can be `srt` (default) or `txt`.
 
-    The server will return the transcription as a file.
+The server will return a task ID. You can use the dashboard to check the status of the transcription.
 
-## API Endpoint
+## API Endpoints
 
 ### `POST /transcribe`
 
-Transcribes an audio file.
+Submits an audio file for transcription.
 
 **Form Data:**
 
@@ -94,5 +110,12 @@ Transcribes an audio file.
 
 **Responses:**
 
--   `200 OK`: Returns the transcription file.
--   `500 Internal Server Error`: If there is an error during the transcription process.
+-   `200 OK`: Returns a task ID.
+
+### `GET /transcribe/{task_id}`
+
+Checks the status of a transcription task.
+
+**Responses:**
+
+-   `200 OK`: Returns the status of the task. If the task is completed, it also returns the path to the transcription file.

@@ -2,4 +2,7 @@ python-dotenv
 python-multipart
 fastapi
 uvicorn
+python-dotenv
 requests
+celery
+redis

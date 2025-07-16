@@ -1,6 +1,10 @@
 from dotenv import load_dotenv
+from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, File, Form, Query, Header, HTTPException, Depends, BackgroundTasks
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from celery.result import AsyncResult
+from celery_worker import transcribe_task
 import subprocess
 import os
 import json
@@ -12,6 +16,8 @@ import requests
 load_dotenv()  # <-- Load environment variables from .env file
 
 app = FastAPI()
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Path to your whisper-cli binary
 WHISPER_CLI = os.environ.get("WHISPER_CLI")
@@ -93,11 +99,7 @@ async def transcribe_audio(
     # Save upload
     uid = str(uuid.uuid4())
 
-    # Use different filename conventions based on OS
-    if os.name == "nt":  # Windows
-        input_path = f"{UPLOAD_DIR}\{uid}_{file.filename}"
-    else:  # Linux/Unix
-        input_path = f"{UPLOAD_DIR}/{uid}_{file.filename}"
+    input_path = os.path.join(UPLOAD_DIR, f"{uid}_{file.filename}")
 
     output_ext = ".srt" if format == "srt" else ".txt"
     output_path = f"{input_path}{output_ext}"
@@ -106,41 +108,51 @@ async def transcribe_audio(
         content = await file.read()
         f.write(content)
 
-    cmd = [WHISPER_CLI, "-m", MODEL, "-f", input_path]
-    if format == "srt":
-        cmd.append("--output-srt")
-    elif format == "txt":
-        cmd.append("--output-txt")
-    if language:
-        cmd.extend(["--language", language])
-
-    t0 = time.time()
-    try:
-        subprocess.run(cmd, check=True)
-    except subprocess.CalledProcessError as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-    processing_time = round(time.time() - t0, 2)
+    task = transcribe_task.delay(input_path, output_path, language, format)
 
     metadata = {
+        "task_id": task.id,
         "file_id": uid,
         "source": "upload",
         "filename": file.filename,
         "output": output_path,
         "language": language or "auto",
-        "processing_time": processing_time
     }
     save_metadata(metadata)
 
-    if make_video:
-        video_path = f"{UPLOAD_DIR}/{uid}_subtitled.mp4"
-        make_subtitled_video(input_path, output_path, video_path)
-        background_tasks.add_task(cleanup_old_files)
-        return FileResponse(video_path, media_type="video/mp4", filename="subtitled.mp4")
+    return {"task_id": task.id}
 
-    background_tasks.add_task(cleanup_old_files)
 
-    return FileResponse(output_path, media_type="text/plain", filename=f"transcript{output_ext}")
+@app.get("/transcribe/{task_id}")
+async def get_transcription_status(task_id: str):
+    task_result = AsyncResult(task_id)
+    if task_result.ready():
+        if task_result.successful():
+            return {"status": "completed", "result": task_result.result}
+        else:
+            return {"status": "failed", "error": str(task_result.result)}
+    else:
+        return {"status": "pending"}
+
+
+@app.get("/", response_class=HTMLResponse)
+async def get_dashboard():
+    with open("static/index.html") as f:
+        return HTMLResponse(content=f.read(), status_code=200)
+
+
+@app.get("/transcriptions")
+async def get_transcriptions():
+    if not os.path.exists(METADATA_FILE):
+        return []
+    with open(METADATA_FILE) as f:
+        return json.load(f)
+
+
+@app.get("/uploads/{file_path:path}")
+async def get_transcription_file(file_path: str):
+    return FileResponse(f"uploads/{file_path}")
+
 
 def cleanup_old_files():
     now = time.time()
