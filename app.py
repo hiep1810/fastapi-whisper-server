@@ -3,8 +3,9 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, File, Form, Query, Header, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from celery import chain
 from celery.result import AsyncResult
-from celery_worker import transcribe_task
+from celery_worker import transcribe_task, create_video_task
 import subprocess
 import os
 import json
@@ -48,44 +49,6 @@ def save_metadata(data):
         json.dump(meta, f, indent=2)
 
 
-def make_subtitled_video(audio_path, srt_path, output_path):
-    # Make sure paths are absolute and FFmpeg-safe
-    audio_path = os.path.abspath(audio_path)
-    srt_path = os.path.abspath(srt_path)
-    output_path = os.path.abspath(output_path)
-
-    # 1. Get audio duration
-    result = subprocess.run(
-        ["ffprobe", "-i", audio_path, "-show_entries", "format=duration", "-v", "quiet", "-of", "csv=p=0"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True
-    )
-    duration = float(result.stdout.strip())
-
-    # FFmpeg on Windows requires special path escaping for the subtitles filter
-    if os.name == 'nt':
-        # Replace backslashes with forward slashes and escape colons
-        srt_path_escaped = srt_path.replace('\\', '/').replace(':', '\\:')
-        subtitles_filter = f"subtitles='{srt_path_escaped}'"
-    else:
-        subtitles_filter = f"subtitles={srt_path}"
-
-
-    # 2. FFmpeg command
-    cmd = [
-        "ffmpeg",
-        "-f", "lavfi",
-        "-i", f"color=size=1280x720:duration={duration}:rate=25:color=black",
-        "-i", audio_path,
-        "-vf", subtitles_filter,
-        "-c:v", "libx264",
-        "-c:a", "aac",
-        "-shortest",
-        output_path
-    ]
-
-    subprocess.run(cmd, check=True)
 
 
 @app.post("/transcribe", dependencies=[Depends(verify_api_key)])
@@ -93,8 +56,7 @@ async def transcribe_audio(
     file: UploadFile = File(...),
     background_tasks: BackgroundTasks = None,
     language: str = Form(default=""),
-    format: str = Form(default="srt"),
-    make_video: bool = Form(default=False)
+    format: str = Form(default="srt")
 ):
     # Save upload
     uid = str(uuid.uuid4())
@@ -115,24 +77,61 @@ async def transcribe_audio(
         "file_id": uid,
         "source": "upload",
         "filename": file.filename,
-        "output": output_path,
+        "input_path": input_path,
+        "output_path": output_path,
         "language": language or "auto",
+        "type": "transcription"
     }
     save_metadata(metadata)
 
     return {"task_id": task.id}
 
 
-@app.get("/transcribe/{task_id}")
-async def get_transcription_status(task_id: str):
+@app.get("/status/{task_id}")
+async def get_task_status(task_id: str):
     task_result = AsyncResult(task_id)
-    if task_result.ready():
-        if task_result.successful():
-            return {"status": "completed", "result": task_result.result}
-        else:
-            return {"status": "failed", "error": str(task_result.result)}
-    else:
+    if not task_result.ready():
         return {"status": "pending"}
+
+    if not task_result.successful():
+        return {"status": "failed", "error": str(task_result.result)}
+
+    return {"status": "completed", "result": task_result.result}
+
+
+@app.post("/create_transcript_video", dependencies=[Depends(verify_api_key)])
+async def create_transcript_video(
+    file: UploadFile = File(...),
+    language: str = Form(default="")
+):
+    # Save upload
+    uid = str(uuid.uuid4())
+    input_path = os.path.join(UPLOAD_DIR, f"{uid}_{file.filename}")
+
+    with open(input_path, "wb") as f:
+        content = await file.read()
+        f.write(content)
+
+    # Create a chain of tasks
+    task_chain = chain(
+        transcribe_task.s(input_path, language),
+        create_video_task.s()
+    )
+    result = task_chain.apply_async()
+
+    # Save metadata for the chained task
+    metadata = {
+        "task_id": result.id,
+        "file_id": uid,
+        "source": "upload",
+        "filename": file.filename,
+        "input_path": input_path,
+        "language": language or "auto",
+        "type": "transcript_video_chain"
+    }
+    save_metadata(metadata)
+
+    return {"task_id": result.id}
 
 
 @app.get("/", response_class=HTMLResponse)
