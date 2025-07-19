@@ -61,7 +61,8 @@ async def transcribe_audio(
     # Save upload
     uid = str(uuid.uuid4())
 
-    input_path = os.path.join(UPLOAD_DIR, f"{uid}_{file.filename}")
+    filename = os.path.splitext(file.filename)[0]
+    input_path = os.path.join(UPLOAD_DIR, f"{uid}_{filename}")
 
     output_ext = ".srt" if format == "srt" else ".txt"
     output_path = f"{input_path}{output_ext}"
@@ -106,7 +107,8 @@ async def create_transcript_video(
 ):
     # Save upload
     uid = str(uuid.uuid4())
-    input_path = os.path.join(UPLOAD_DIR, f"{uid}_{file.filename}")
+    filename = os.path.splitext(file.filename)[0]
+    input_path = os.path.join(UPLOAD_DIR, f"{uid}_{filename}")
 
     with open(input_path, "wb") as f:
         content = await file.read()
