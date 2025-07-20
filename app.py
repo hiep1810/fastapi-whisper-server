@@ -109,6 +109,8 @@ async def create_transcript_video(
     uid = str(uuid.uuid4())
     filename = os.path.splitext(file.filename)[0]
     input_path = os.path.join(UPLOAD_DIR, f"{uid}_{filename}")
+    
+    output_path = f"{input_path}.srt"
 
     with open(input_path, "wb") as f:
         content = await file.read()
@@ -116,7 +118,7 @@ async def create_transcript_video(
 
     # Create a chain of tasks
     task_chain = chain(
-        transcribe_task.s(input_path, language),
+        transcribe_task.s(input_path, output_path, language, "srt"),
         create_video_task.s()
     )
     result = task_chain.apply_async()

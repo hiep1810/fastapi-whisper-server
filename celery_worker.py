@@ -21,18 +21,22 @@ if not MODEL:
     raise ValueError("❌ MODEL is not set! Please check your .env file.")
 
 @celery_app.task(bind=True)
-def transcribe_task(self, input_path, language):
+def transcribe_task(self, input_path, output_path, language, format):
     # Output path is determined inside the task
-    output_path = f"{os.path.splitext(input_path)[0]}.srt"
+    output_path = f"{os.path.splitext(input_path)[0]}.{format}"
 
-    cmd = [WHISPER_CLI, "-m", MODEL, "-f", input_path, "--output-srt"]
+    cmd = [WHISPER_CLI, "-m", MODEL, "-f", input_path]
+    if format == "srt":
+        cmd.append("--output-srt")
+    elif format == "txt":
+        cmd.append("--output-txt")
     if language:
         cmd.extend(["--language", language])
 
     try:
         subprocess.run(cmd, check=True)
         # Return paths for the next task in the chain
-        return {"audio_path": input_path, "srt_path": output_path}
+        return {"input_path": input_path, "output_path": output_path}
     except subprocess.CalledProcessError as e:
         self.update_state(state='FAILURE', meta={'error': str(e)})
         raise e

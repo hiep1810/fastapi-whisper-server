@@ -26,7 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function pollStatus(taskId) {
-        const response = await fetch(`/transcribe/${taskId}`);
+        const response = await fetch(`/status/${taskId}`);
         const data = await response.json();
 
         const row = document.querySelector(`tr[data-task-id="${taskId}"]`);
@@ -36,7 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
         statusCell.textContent = data.status;
 
         if (data.status === "completed") {
-            actionsCell.innerHTML = `<button class="view-button" data-path="${data.result.result}">View</button>`;
+            actionsCell.innerHTML = `<button class="view-button" data-path="${data.result.output_path}">View</button>`;
         } else if (data.status === "failed") {
             actionsCell.innerHTML = `<button class="view-error-button" data-error="${data.error}">View Error</button>`;
         } else {
@@ -47,6 +47,7 @@ document.addEventListener("DOMContentLoaded", () => {
     tableBody.addEventListener("click", async (event) => {
         if (event.target.classList.contains("view-button")) {
             const path = event.target.dataset.path;
+            console.log(`Fetching transcription from: ${path}`);
             const response = await fetch(`/${path}`);
             const content = await response.text();
             modalContent.textContent = content;
