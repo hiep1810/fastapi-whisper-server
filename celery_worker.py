@@ -12,6 +12,7 @@ celery_app.conf.update(
     result_backend=os.environ.get("CELERY_RESULT_BACKEND_URL", "redis://localhost:6379/0"),
 )
 
+WHISPER_MODELS_DIR = os.environ.get("WHISPER_MODELS_DIR")
 WHISPER_CLI = os.environ.get("WHISPER_CLI")
 MODEL = os.environ.get("MODEL")
 
@@ -28,7 +29,7 @@ def transcribe_task(self, input_path, output_path, language, format, model=None)
 
     # Use the provided model, or fall back to the environment variable
     model_name = model or os.environ.get("MODEL", "base")
-    model_path = f"/app/models/{model_name}"
+    model_path = f"{WHISPER_MODELS_DIR}/{model_name}"
 
     cmd = [WHISPER_CLI, "-m", model_path, "-f", input_path]
     if format == "srt":

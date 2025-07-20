@@ -13,7 +13,8 @@ services:
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND_URL=redis://redis:6379/0
-      - WHISPER_CLI=/usr/local/bin/whisper-cli
+      - WHISPER_CLI=/app/whisper.cpp/build/bin/whisper-cli
+      - WHISPER_MODELS_DIR=/app/whisper.cpp/models
       - MODEL=ggml-medium-q8_0.bin
       - UPLOAD_DIR=/app/uploads
       - METADATA_FILE=/app/metadata.json
@@ -30,7 +31,8 @@ services:
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND_URL=redis://redis:6379/0
-      - WHISPER_CLI=/usr/local/bin/whisper-cli
+      - WHISPER_CLI=/app/whisper.cpp/build/bin/whisper-cli
+      - WHISPER_MODELS_DIR=/app/whisper.cpp/models
       - MODEL=ggml-medium-q8_0.bin
       - UPLOAD_DIR=/app/uploads
     volumes:
