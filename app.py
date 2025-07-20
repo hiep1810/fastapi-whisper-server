@@ -97,7 +97,22 @@ async def get_task_status(task_id: str):
     if not task_result.successful():
         return {"status": "failed", "error": str(task_result.result)}
 
-    return {"status": "completed", "result": task_result.result}
+    result = task_result.result
+    file_type = "unknown"
+
+    # Determine file type from result
+    if isinstance(result, dict):
+        path = result.get("output_path") or result.get("result")
+        if path and isinstance(path, str):
+            ext = os.path.splitext(path)[1].lower()
+            if ext in [".srt", ".txt", ".vtt"]:
+                file_type = "text"
+            elif ext in [".mp4", ".mov", ".avi", ".mkv"]:
+                file_type = "video"
+            elif ext in [".mp3", ".wav", ".ogg", ".flac"]:
+                file_type = "audio"
+
+    return {"status": "completed", "result": result, "file_type": file_type}
 
 
 @app.post("/create_transcript_video", dependencies=[Depends(verify_api_key)])

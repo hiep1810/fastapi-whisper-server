@@ -36,7 +36,8 @@ document.addEventListener("DOMContentLoaded", () => {
         statusCell.textContent = data.status;
 
         if (data.status === "completed") {
-            actionsCell.innerHTML = `<button class="view-button" data-path="${data.result.output_path}">View</button>`;
+            const resultPath = data.result.output_path || data.result.result;
+            actionsCell.innerHTML = `<button class="view-button" data-path="${resultPath}" data-file-type="${data.file_type}">View</button>`;
         } else if (data.status === "failed") {
             actionsCell.innerHTML = `<button class="view-error-button" data-error="${data.error}">View Error</button>`;
         } else {
@@ -46,11 +47,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
     tableBody.addEventListener("click", async (event) => {
         if (event.target.classList.contains("view-button")) {
-            const path = event.target.dataset.path;
-            console.log(`Fetching transcription from: ${path}`);
-            const response = await fetch(`/${path}`);
-            const content = await response.text();
-            modalContent.textContent = content;
+            const button = event.target;
+            const path = button.dataset.path;
+            const fileType = button.dataset.fileType;
+
+            modalContent.innerHTML = ""; // Clear previous content
+
+            if (fileType === "video") {
+                const video = document.createElement("video");
+                video.src = `/${path}`;
+                video.controls = true;
+                video.style.maxWidth = "100%";
+                modalContent.appendChild(video);
+            } else if (fileType === "audio") {
+                const audio = document.createElement("audio");
+                audio.src = `/${path}`;
+                audio.controls = true;
+                modalContent.appendChild(audio);
+            } else {
+                const response = await fetch(`/${path}`);
+                const content = await response.text();
+                modalContent.textContent = content;
+            }
+
             modal.style.display = "block";
         } else if (event.target.classList.contains("view-error-button")) {
             const error = event.target.dataset.error;
