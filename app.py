@@ -56,7 +56,8 @@ async def transcribe_audio(
     file: UploadFile = File(...),
     background_tasks: BackgroundTasks = None,
     language: str = Form(default=""),
-    format: str = Form(default="srt")
+    format: str = Form(default="srt"),
+    model: str = Form(default=os.environ.get("MODEL", "base"))
 ):
     # Save upload
     uid = str(uuid.uuid4())
@@ -71,7 +72,7 @@ async def transcribe_audio(
         content = await file.read()
         f.write(content)
 
-    task = transcribe_task.delay(input_path, output_path, language, format)
+    task = transcribe_task.delay(input_path, output_path, language, format, model)
 
     metadata = {
         "task_id": task.id,
@@ -184,7 +185,8 @@ async def transcribe_from_url(
     url: str = Query(..., description="Audio file URL"),
     background_tasks: BackgroundTasks = None,
     language: str = Query(default=""),
-    format: str = Query(default="srt")
+    format: str = Query(default="srt"),
+    model: str = Query(default=os.environ.get("MODEL", "base"))
 ):
     uid = str(uuid.uuid4())
     input_path = f"{UPLOAD_DIR}/{uid}_remote_audio"
@@ -199,7 +201,8 @@ async def transcribe_from_url(
         for chunk in r.iter_content(1024):
             f.write(chunk)
 
-    cmd = [WHISPER_CLI, "-m", MODEL, "-f", input_path]
+    model_path = f"/app/models/{model}"
+    cmd = [WHISPER_CLI, "-m", model_path, "-f", input_path]
     if format == "srt":
         cmd.append("--output-srt")
     elif format == "txt":
