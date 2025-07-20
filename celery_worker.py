@@ -84,13 +84,15 @@ def make_subtitled_video(audio_path, srt_path, output_path):
 
 @celery_app.task(bind=True)
 def create_video_task(self, paths):
-    audio_path = paths['audio_path']
-    srt_path = paths['srt_path']
+    # The 'paths' argument is the return value of the previous task in the chain
+    audio_path = paths['input_path']  # Use 'input_path' from transcribe_task
+    srt_path = paths['output_path']   # Use 'output_path' from transcribe_task
     video_path = f"{os.path.splitext(audio_path)[0]}_subtitled.mp4"
 
     try:
         make_subtitled_video(audio_path, srt_path, video_path)
-        return {"status": "completed", "result": video_path}
+        # The final result of the chain is this dictionary
+        return {"status": "completed", "output_path": video_path}
     except Exception as e:
         self.update_state(state='FAILURE', meta={'error': str(e)})
         raise e
