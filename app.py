@@ -4,8 +4,7 @@ from fastapi import FastAPI, UploadFile, File, Form, Query, Header, HTTPExceptio
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from celery import chain
-from celery.result import AsyncResult
-from celery_worker import transcribe_task, create_video_task
+from celery_worker import celery_app, transcribe_task, create_video_task
 import subprocess
 import os
 import json
@@ -91,7 +90,7 @@ async def transcribe_audio(
 
 @app.get("/status/{task_id}")
 async def get_task_status(task_id: str):
-    task_result = AsyncResult(task_id)
+    task_result = celery_app.AsyncResult(task_id)
     if not task_result.ready():
         return {"status": "pending"}
 
