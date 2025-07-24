@@ -64,7 +64,15 @@ async def transcribe_audio(
     filename = os.path.splitext(file.filename)[0]
     input_path = os.path.join(UPLOAD_DIR, f"{uid}_{filename}")
 
-    output_ext = ".srt" if format == "srt" else ".txt"
+    if format == "srt": 
+        output_ext = ".srt"
+    if format == "txt":
+        output_ext = ".txt" 
+    if format == "vtt":
+        output_ext = ".vtt"
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported format. Use 'srt', 'txt', or 'vtt'.")
+
     output_path = f"{input_path}{output_ext}"
 
     with open(input_path, "wb") as f:
