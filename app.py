@@ -66,9 +66,9 @@ async def transcribe_audio(
 
     if format == "srt": 
         output_ext = ".srt"
-    if format == "txt":
+    elif format == "txt":
         output_ext = ".txt" 
-    if format == "vtt":
+    elif format == "vtt":
         output_ext = ".vtt"
     else:
         raise HTTPException(status_code=400, detail="Unsupported format. Use 'srt', 'txt', or 'vtt'.")
@@ -113,7 +113,9 @@ async def get_task_status(task_id: str):
         path = result.get("output_path") or result.get("result")
         if path and isinstance(path, str):
             ext = os.path.splitext(path)[1].lower()
-            if ext in [".srt", ".txt", ".vtt"]:
+            if ext == ".vtt":
+                file_type = "vtt"
+            elif ext in [".srt", ".txt"]:
                 file_type = "text"
             elif ext in [".mp4", ".mov", ".avi", ".mkv"]:
                 file_type = "video"

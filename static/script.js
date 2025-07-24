@@ -2,7 +2,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const tableBody = document.querySelector("#transcriptions-table tbody");
     const modal = document.getElementById("transcription-modal");
     const modalContent = document.getElementById("transcription-content");
+    const videoContainer = document.getElementById("video-container");
+    const videoUploadInput = document.getElementById("video-upload-input");
     const closeButton = document.querySelector(".close-button");
+
+    let currentVttPath = null;
 
     async function loadTranscriptions() {
         const response = await fetch("/transcriptions");
@@ -51,26 +55,31 @@ document.addEventListener("DOMContentLoaded", () => {
             const path = button.dataset.path;
             const fileType = button.dataset.fileType;
 
-            modalContent.innerHTML = ""; // Clear previous content
+            modalContent.innerHTML = "";
+            videoContainer.innerHTML = "";
 
-            if (fileType === "video") {
+            if (fileType === "vtt") {
+                currentVttPath = path;
+                videoUploadInput.click();
+            } else if (fileType === "video") {
                 const video = document.createElement("video");
                 video.src = `/${path}`;
                 video.controls = true;
                 video.style.maxWidth = "100%";
-                modalContent.appendChild(video);
+                videoContainer.appendChild(video);
+                modal.style.display = "block";
             } else if (fileType === "audio") {
                 const audio = document.createElement("audio");
                 audio.src = `/${path}`;
                 audio.controls = true;
-                modalContent.appendChild(audio);
+                videoContainer.appendChild(audio);
+                modal.style.display = "block";
             } else {
                 const response = await fetch(`/${path}`);
                 const content = await response.text();
                 modalContent.textContent = content;
+                modal.style.display = "block";
             }
-
-            modal.style.display = "block";
         } else if (event.target.classList.contains("view-error-button")) {
             const error = event.target.dataset.error;
             modalContent.textContent = error;
@@ -80,12 +89,40 @@ document.addEventListener("DOMContentLoaded", () => {
 
     closeButton.addEventListener("click", () => {
         modal.style.display = "none";
+        videoContainer.innerHTML = "";
+        modalContent.innerHTML = "";
     });
 
     window.addEventListener("click", (event) => {
         if (event.target == modal) {
             modal.style.display = "none";
+            videoContainer.innerHTML = "";
+            modalContent.innerHTML = "";
         }
+    });
+
+    videoUploadInput.addEventListener("change", (event) => {
+        const file = event.target.files[0];
+        if (file && currentVttPath) {
+            const videoURL = URL.createObjectURL(file);
+            const video = document.createElement("video");
+            video.src = videoURL;
+            video.controls = true;
+            video.style.maxWidth = "100%";
+
+            const track = document.createElement("track");
+            track.src = `/${currentVttPath}`;
+            track.kind = "subtitles";
+            track.srclang = "en";
+            track.label = "English";
+            track.default = true;
+
+            video.appendChild(track);
+            videoContainer.appendChild(video);
+            modal.style.display = "block";
+        }
+        // Reset the input so the change event fires again for the same file
+        videoUploadInput.value = "";
     });
 
     loadTranscriptions();
