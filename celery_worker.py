@@ -36,6 +36,8 @@ def transcribe_task(self, input_path, output_path, language, format, model=None)
         cmd.append("--output-srt")
     elif format == "txt":
         cmd.append("--output-txt")
+    elif format == "vtt":
+        cmd.append("--output-vtt")
     if language:
         cmd.extend(["--language", language])
 
